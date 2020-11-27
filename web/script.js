@@ -59,7 +59,7 @@ function placeFood(snake) {
   return cord;
 }
 
-async function step(action, food, snake) {
+function step(action, food, snake) {
   const previousState = buildState(food, [...snake.map((s) => copy(s))]);
   const { x, y } = [...snake.map((s) => copy(s))][snake.length - 1];
   var done = false;
@@ -132,12 +132,63 @@ async function step(action, food, snake) {
   };
 }
 
-(async () => {
-  const model = await tf.loadLayersModel("./tfjs_model/model.json");
+function visualizeQ(snake, preds) {
+  // Clear screen regardless of whether visualize-q is selected to avoid
+  // old numbers remaining when user unselects the feature.
+  for (let index = 0; index < cells.length; index++) {
+    cells[index].textContent = "";
+  }
 
+  if (document.getElementById("visualize-q").checked) {
+    const { x, y } = snake[snake.length - 1];
+    cellAt({ x: x, y: y }).textContent = ":)";
+    if (y - 1 >= 0) {
+      cellAt({ x: x, y: y - 1 }).textContent = Number.parseFloat(
+        preds.dataSync()[0]
+      ).toPrecision(2);
+    }
+    if (x + 1 < width) {
+      cellAt({ x: x + 1, y: y }).textContent = Number.parseFloat(
+        preds.dataSync()[1]
+      ).toPrecision(2);
+    }
+    if (y + 1 < height) {
+      cellAt({ x: x, y: y + 1 }).textContent = Number.parseFloat(
+        preds.dataSync()[2]
+      ).toPrecision(2);
+    }
+    if (x - 1 >= 0) {
+      cellAt({ x: x - 1, y: y }).textContent = Number.parseFloat(
+        preds.dataSync()[3]
+      ).toPrecision(2);
+    }
+  }
+}
+
+function cycle(model, action, food, snake) {
+  const { state, done, reward, snake: newSnake, food: newFood } = step(
+    action,
+    copy(food),
+    [...snake.map((s) => copy(s))]
+  );
+
+  document.getElementById("total-reward").textContent =
+    Number(document.getElementById("total-reward").textContent) + reward;
+
+  const preds = model.predict(state);
+  visualizeQ(newSnake, preds);
+  action = tf.argMax(preds, -1).dataSync()[0];
+
+  return { newSnake, newFood, action, reward, done };
+}
+
+var intervalId;
+
+async function restart() {
+  const model = await tf.loadLayersModel("./tfjs_model/model.json");
+  var action = 0;
   const snakeX = random(0, width);
   const snakeY = random(3, height);
-  var totalReward = 3;
 
   var snake = [
     { x: snakeX, y: snakeY },
@@ -146,56 +197,28 @@ async function step(action, food, snake) {
   ];
   var food = placeFood(snake);
 
-  var action = 0;
-  while (true) {
-    const {
-      state,
-      done,
-      reward,
-      snake: newSnake,
-      food: newFood,
-    } = await step(action, copy(food), [...snake.map((s) => copy(s))]);
-    snake = newSnake;
-    food = newFood;
-    if (done) {
-      //   window.location.reload();
-      break;
-    }
-    totalReward += reward;
-    document.getElementById("total-reward").textContent = totalReward;
-    const preds = await model.predict(state);
-
-    const visualizeQ = false;
-    if (visualizeQ) {
-      for (let index = 0; index < cells.length; index++) {
-        cells[index].textContent = "";
+  if (!intervalId) {
+    intervalId = setInterval(() => {
+      console.log("snake 1", snake);
+      const { newSnake, newFood, action: newAction, reward, done } = cycle(
+        model,
+        action,
+        food,
+        snake
+      );
+      if (done) {
+        clearInterval(intervalId);
       }
-
-      const { x, y } = snake[snake.length - 1];
-      cellAt({ x: x, y: y }).textContent = ":)";
-      if (y - 1 >= 0) {
-        cellAt({ x: x, y: y - 1 }).textContent = Number.parseFloat(
-          preds.dataSync()[0]
-        ).toPrecision(2);
-      }
-      if (x + 1 < width) {
-        cellAt({ x: x + 1, y: y }).textContent = Number.parseFloat(
-          preds.dataSync()[1]
-        ).toPrecision(2);
-      }
-      if (y + 1 < height) {
-        cellAt({ x: x, y: y + 1 }).textContent = Number.parseFloat(
-          preds.dataSync()[2]
-        ).toPrecision(2);
-      }
-      if (x - 1 >= 0) {
-        cellAt({ x: x - 1, y: y }).textContent = Number.parseFloat(
-          preds.dataSync()[3]
-        ).toPrecision(2);
-      }
-    }
-
-    action = tf.argMax(preds, -1).dataSync()[0];
-    await timer(250);
+      console.log("snake 2", newSnake, snake);
+      food = newFood;
+      action = newAction;
+      snake = newSnake;
+      console.log("new ", newSnake);
+    }, 500);
+  } else {
+    clearInterval(intervalId);
+    intervalId = null;
+    restart();
   }
-})();
+}
+restart();
