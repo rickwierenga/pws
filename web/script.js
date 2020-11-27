@@ -49,6 +49,16 @@ function copy(x) {
   return Object.assign({}, x);
 }
 
+function placeFood(snake) {
+  const cord = { x: random(0, width), y: random(0, height) };
+  for (let i = 0; i < snake.length; i++) {
+    if (snake[i].x === cord.x && snake[i].y === cord.y) {
+      return placeFood(snake);
+    }
+  }
+  return cord;
+}
+
 async function step(action, food, snake) {
   const previousState = buildState(food, [...snake.map((s) => copy(s))]);
   const { x, y } = [...snake.map((s) => copy(s))][snake.length - 1];
@@ -103,7 +113,7 @@ async function step(action, food, snake) {
   if (!done) {
     if (newPos.x === food.x && newPos.y === food.y) {
       reward = 1;
-      food = { x: random(0, width), y: random(0, height) };
+      food = placeFood(snake);
     } else {
       snake.shift();
     }
@@ -125,7 +135,6 @@ async function step(action, food, snake) {
 (async () => {
   const model = await tf.loadLayersModel("./tfjs_model/model.json");
 
-  var food = { x: random(0, width), y: random(0, height) };
   const snakeX = random(0, width);
   const snakeY = random(3, height);
   var totalReward = 3;
@@ -135,6 +144,7 @@ async function step(action, food, snake) {
     { x: snakeX, y: snakeY - 1 },
     { x: snakeX, y: snakeY - 2 },
   ];
+  var food = placeFood(snake);
 
   var action = 0;
   while (true) {
