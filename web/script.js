@@ -199,7 +199,6 @@ async function restart() {
 
   if (!intervalId) {
     intervalId = setInterval(() => {
-      console.log("snake 1", snake);
       const { newSnake, newFood, action: newAction, reward, done } = cycle(
         model,
         action,
@@ -209,11 +208,9 @@ async function restart() {
       if (done) {
         clearInterval(intervalId);
       }
-      console.log("snake 2", newSnake, snake);
       food = newFood;
       action = newAction;
       snake = newSnake;
-      console.log("new ", newSnake);
     }, 500);
   } else {
     clearInterval(intervalId);
